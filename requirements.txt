@@ -1,0 +1,7 @@
+faiss-cpu
+sentence-transformers
+pymongo
+fastapi
+uvicorn
+bson
+numpy
