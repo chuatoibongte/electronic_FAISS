@@ -3,11 +3,12 @@ from pydantic import BaseModel
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
+from mangum import Mangum
 DIM = 768
 MODEL_NAME = 'intfloat/multilingual-e5-base'
 
 app = FastAPI()
+handler= Mangum(app)
 index = faiss.read_index('faiss_index.bin')
 model = SentenceTransformer(MODEL_NAME)
 
