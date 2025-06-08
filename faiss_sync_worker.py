@@ -4,14 +4,14 @@ import os
 from pymongo import MongoClient
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
-import clip
+from transformers import AutoImageProcessor, SwinModel
 from utils import build_description_concat, get_mean_image_embedding
 
 # ========== CONFIG ==========
 DIM_TEXT = 768
 MODEL_NAME_TEXT = 'intfloat/multilingual-e5-base'
-DIM_IMAGE = 512
-MODEL_NAME_IMAGE = "ViT-B/32"
+DIM_IMAGE = 1024  # Swin-base
+MODEL_NAME_IMAGE = "microsoft/swin-base-patch4-window7-224"
 MAPPING_FILE = 'faiss_id_map.txt'
 
 # ========== LOAD ==========
@@ -24,7 +24,8 @@ collection = db['electronics']
 index_text = faiss.read_index('faiss_index.bin')
 index_image = faiss.read_index('faiss_index_image.bin')
 model_text = SentenceTransformer(MODEL_NAME_TEXT)
-clip_model, preprocess = clip.load(MODEL_NAME_IMAGE, device="cpu")
+image_processor = AutoImageProcessor.from_pretrained(MODEL_NAME_IMAGE)
+swin_model = SwinModel.from_pretrained(MODEL_NAME_IMAGE)
 
 def read_mapping():
     if not os.path.exists(MAPPING_FILE):
@@ -37,9 +38,9 @@ def write_mapping(mapping):
         for _id in mapping:
             f.write(_id + '\n')
 
-def try_get_image_embedding(image_urls, clip_model, preprocess, max_retry=5):
+def try_get_image_embedding(image_urls, swin_model, image_processor, max_retry=5):
     for attempt in range(max_retry):
-        mean_vec = get_mean_image_embedding(image_urls, clip_model, preprocess)
+        mean_vec = get_mean_image_embedding(image_urls, swin_model, image_processor)
         if mean_vec is not None:
             if attempt > 0:
                 print(f"✅ Đã lấy được image embedding ở lần thử thứ {attempt+1}")
@@ -54,7 +55,7 @@ def sync_added(doc):
     embedding_text = model_text.encode(['passage: ' + description_concat], normalize_embeddings=True)[0]
     # IMAGE (thử lại tối đa 5 lần)
     image_urls = [img['url'] for img in doc.get('electronicImgs', []) if img.get('url')]
-    mean_vec = try_get_image_embedding(image_urls, clip_model, preprocess, max_retry=5)
+    mean_vec = try_get_image_embedding(image_urls, swin_model, image_processor, max_retry=5)
     if mean_vec is None:
         print(f"⚠️ Không thêm được IMAGE cho: {doc['_id']} (skip luôn cả text/mapping)")
         return  # Không add vào index hoặc mapping nếu ảnh lỗi!
@@ -129,7 +130,7 @@ def sync_updated(doc):
         description_concat = build_description_concat(doc)
         embedding_text = model_text.encode(['passage: ' + description_concat], normalize_embeddings=True)[0]
         image_urls = [img['url'] for img in doc.get('electronicImgs', []) if img.get('url')]
-        mean_vec = try_get_image_embedding(image_urls, clip_model, preprocess, max_retry=5)
+        mean_vec = try_get_image_embedding(image_urls, swin_model, image_processor, max_retry=5)
         if mean_vec is None:
             # Không add lại vào mapping/index nếu ảnh vẫn lỗi
             write_mapping(mapping)

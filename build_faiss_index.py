@@ -8,12 +8,13 @@ import clip
 import torch
 from utils import build_description_concat, get_mean_image_embedding
 from bson import ObjectId
+from transformers import AutoImageProcessor, SwinModel
 
 # ========== CÀI ĐẶT ==========
 DIM_TEXT = 768
 MODEL_NAME_TEXT = 'intfloat/multilingual-e5-base'
-MODEL_NAME_IMAGE = "ViT-B/32"
-DIM_IMAGE = 512  # ViT-B/32
+MODEL_NAME_IMAGE = "microsoft/swin-base-patch4-window7-224"
+DIM_IMAGE = 1024  # Swin base patch4 window7 224 output dim
 
 load_dotenv()
 MONGO_URI = os.environ.get("MONGO_URI")
@@ -25,7 +26,8 @@ docs = list(collection.find({}))
 # ========== LOAD MODELS ==========
 print("🔹 Đang load model...")
 text_model = SentenceTransformer(MODEL_NAME_TEXT)
-clip_model, preprocess = clip.load(MODEL_NAME_IMAGE, device="cpu")
+image_processor = AutoImageProcessor.from_pretrained(MODEL_NAME_IMAGE)
+swin_model = SwinModel.from_pretrained(MODEL_NAME_IMAGE)
 
 # ========== BẮT ĐẦU BUILD ==========
 mongo_ids = []
@@ -37,7 +39,7 @@ print("🔹 Duyệt từng sản phẩm (build lần 1)...")
 for doc in docs:
     # 1. Lấy embedding image trước
     image_urls = [img['url'] for img in doc.get('electronicImgs', []) if img.get('url')]
-    mean_vec = get_mean_image_embedding(image_urls, clip_model, preprocess)
+    mean_vec = get_mean_image_embedding(image_urls, swin_model, image_processor)
     if mean_vec is None:
         print(f"⚠️ Bỏ qua doc {doc.get('_id')} (không có image hợp lệ, sẽ retry sau)")
         failed_ids.append(str(doc.get('_id')))
@@ -72,7 +74,7 @@ for failed_id in failed_ids:
     mean_vec = None
     # Thử tối đa 5 lần
     for attempt in range(5):
-        mean_vec = get_mean_image_embedding(image_urls, clip_model, preprocess)
+        mean_vec = get_mean_image_embedding(image_urls, swin_model, image_processor)
         if mean_vec is not None:
             print(f"✅ Đã cứu thành công ảnh cho sản phẩm {failed_id} ở lần thử {attempt+1}!")
             break

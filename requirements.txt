@@ -5,5 +5,8 @@ fastapi
 uvicorn
 bson
 numpy
-git+https://github.com/openai/CLIP.git
 python-multipart
+mangum
+python-dotenv
+transformers
+Pillow

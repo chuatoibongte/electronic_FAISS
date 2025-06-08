@@ -24,14 +24,13 @@ def build_description_concat(doc):
     return description_concat
 
 
-# utils.py
 import requests
 from PIL import Image
 from io import BytesIO
 import torch
 import numpy as np
 
-def get_mean_image_embedding(image_url_list, clip_model, preprocess):
+def get_mean_image_embedding(image_url_list, swin_model, image_processor, device="cpu"):
     vectors = []
     for idx, url in enumerate(image_url_list):
         try:
@@ -41,11 +40,19 @@ def get_mean_image_embedding(image_url_list, clip_model, preprocess):
             response.raise_for_status()
             image = Image.open(BytesIO(response.content)).convert("RGB")
             print("    - PIL mở ảnh OK:", image.size)
-            image_tensor = preprocess(image).unsqueeze(0)
-            print("    - Preprocess shape:", image_tensor.shape)
+            
+            # Tiền xử lý cho Swin Transformer
+            inputs = image_processor(image, return_tensors="pt")
+
+            print("    - Preprocess shape:", inputs['pixel_values'].shape)
+            
             with torch.no_grad():
-                embedding = clip_model.encode_image(image_tensor)
+                outputs = swin_model(**inputs)
+                # Swin base patch4 window7 output là [B, 1024]
+                embedding = outputs.pooler_output
+                # Chuẩn hóa vector (giống logic cũ)
                 embedding = embedding / embedding.norm(dim=-1, keepdim=True)
+            
             vectors.append(embedding.cpu().numpy()[0])
             print("    - Vector embedding OK (10 số đầu):", vectors[-1][:10])
         except Exception as e:
