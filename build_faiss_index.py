@@ -47,6 +47,7 @@ for doc in docs:
 
     # 2. Nếu có ảnh hợp lệ, lấy embedding text
     description_concat = build_description_concat(doc)
+    #vector hóa text có chuẩn hóa về cùng đơn vị để sử dụng cosine 
     text_emb = text_model.encode("passage: " + description_concat, normalize_embeddings=True)
 
     # 3. Lưu vào list
@@ -72,7 +73,7 @@ for failed_id in failed_ids:
 
     image_urls = [img['url'] for img in doc.get('electronicImgs', []) if img.get('url')]
     mean_vec = None
-    # Thử tối đa 5 lần
+    # load lại  tối đa 5 lần để xem có tải được ảnh khôngkhông
     for attempt in range(5):
         mean_vec = get_mean_image_embedding(image_urls, swin_model, image_processor)
         if mean_vec is not None:
@@ -81,8 +82,10 @@ for failed_id in failed_ids:
         else:
             print(f"⏳ Thử lại lần {attempt+1} cho sản phẩm {failed_id}...")
 
+    #nếu load được thì sẽ bắt đầu vector hóa text
     if mean_vec is not None:
         description_concat = build_description_concat(doc)
+        #vector hóa text có chuẩn hóa về cùng đơn vị để sử dụng cosine
         text_emb = text_model.encode("passage: " + description_concat, normalize_embeddings=True)
         mongo_ids.append(str(doc['_id']))
         image_embeddings.append(mean_vec)
@@ -98,6 +101,8 @@ if text_embeddings and image_embeddings:
     text_embeddings = np.array(text_embeddings, dtype='float32')
     image_embeddings = np.array(image_embeddings, dtype='float32')
 
+
+    #sử dụng vector vô hướng vì faiss hỗ trợ cái này thôi
     index_text = faiss.IndexFlatIP(text_embeddings.shape[1])
     index_img = faiss.IndexFlatIP(image_embeddings.shape[1])
     index_text.add(text_embeddings)

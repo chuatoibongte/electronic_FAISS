@@ -1,3 +1,4 @@
+#biến nội dung của 1 json thành 1 chuỗi
 def build_description_concat(doc):
     name = doc.get('name', '')
     brand = doc.get('brandName', '')
@@ -17,9 +18,11 @@ def build_description_concat(doc):
     specs_text = " | ".join(specs)
 
     description_concat = (
+        f"Loại sản phẩm: {main_category} | Tên sản phẩm: {name} | Nhóm sản phẩm: {categories} | "
         f"Tên: {name} | Hãng: {brand} | Loại chính: {main_category} | "
         f"Nhóm: {categories} | Giá: {price} | Đánh giá: {rating} | "
-        f"Mô tả: {description} | Thông số: {specs_text}"
+        f"Mô tả: {description} | Thông số kỹ thuật: {specs_text} | "
+        f"Từ khóa: {main_category}, {name}, {categories}"
     )
     return description_concat
 
@@ -50,7 +53,7 @@ def get_mean_image_embedding(image_url_list, swin_model, image_processor, device
                 outputs = swin_model(**inputs)
                 # Swin base patch4 window7 output là [B, 1024]
                 embedding = outputs.pooler_output
-                # Chuẩn hóa vector (giống logic cũ)
+                # Chuẩn hóa vector (để sử dụng cosinecosine)
                 embedding = embedding / embedding.norm(dim=-1, keepdim=True)
             
             vectors.append(embedding.cpu().numpy()[0])
@@ -60,6 +63,7 @@ def get_mean_image_embedding(image_url_list, swin_model, image_processor, device
     print(f"==> Tổng số ảnh embedding thành công: {len(vectors)}/{len(image_url_list)}")
     if not vectors:
         return None
+    #trả về trung bình vector của tất cả ảnhảnh
     return np.mean(vectors, axis=0)
 
 

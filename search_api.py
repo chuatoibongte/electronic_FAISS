@@ -41,6 +41,7 @@ class SearchResponse(BaseModel):
 # ==== API Search text ====
 @app.post('/search_ids', response_model=SearchResponse)
 async def search_ids(body: SearchRequest):
+    #chuyển query về vector có chuẩn hóa để truy vấn consine ( thực tế là inner product hay là tích vô hướng nhưng do có chuẩn hóa nên vẫn truy vấn về cosin )
     query_vec = model_text.encode(['query: ' + body.query], normalize_embeddings=True)
     D, I = index_text.search(np.array(query_vec, dtype='float32'), body.top_k)
     ids = [faiss_id_map[idx] for idx in I[0]]
@@ -57,6 +58,7 @@ async def search_image(file: UploadFile = File(...), top_k: int = 5):
     with torch.no_grad():
         outputs = swin_model(**inputs)
         embedding = outputs.pooler_output  # [1, 1024]
+        #vector hóa phần query và chuẩn hóa nó lại
         embedding = embedding / embedding.norm(dim=-1, keepdim=True)
     image_vec = embedding.cpu().numpy().astype('float32')
     D, I = index_img.search(image_vec, top_k)
